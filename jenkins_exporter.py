@@ -20,7 +20,7 @@ COLLECTION_TIME = Summary(
 
 
 class JenkinsClient:
-    def _init_(self, jenkins_base_url, username, password, insecure=False):
+    def __init__(self, jenkins_base_url, username, password, insecure=False):
         self._insecure = insecure
         self._password = password
         self._username = username
@@ -88,7 +88,7 @@ def calculate_total_duration(build_data):
 
 
 class JenkinsCollector(object):
-    def _init_(self, jenkins_client):
+    def __init__(self, jenkins_client):
         self._jenkins = jenkins_client
 
     def collect(self):
@@ -161,17 +161,17 @@ class JenkinsCollector(object):
                 labels=["jobname"],
             ),
             "stage_duration": GaugeMetricFamily(
-                "jenkins_job_monitor_stage.duration",
+                "jenkins_job_monitor_stage_duration",
                 "Jenkins build stage duration in ms",
                 labels=["jobname", "stagename", "build"],
             ),
             "stage_pass_count": CounterMetricFamily(
-                "jenkins_job_monitor_stage.pass_count",
+                "jenkins_job_monitor_stage_pass_count",
                 "Jenkins build stage pass count",
                 labels=["jobname", "stagename"],
             ),
             "stage_fail_count": CounterMetricFamily(
-                "jenkins_job_monitor_stage.fail_count",
+                "jenkins_job_monitor_stage_fail_count",
                 "Jenkins build stage fail count",
                 labels=["jobname", "stagename"],
             ),
@@ -290,3 +290,6 @@ def main():
     except KeyboardInterrupt:
         print(" Interrupted")
         exit(0)
+
+if __name__ == "__main__":	
+    main()
