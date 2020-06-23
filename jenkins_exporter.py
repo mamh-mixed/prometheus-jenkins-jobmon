@@ -2,10 +2,10 @@
 
 import argparse
 import datetime
+import logging
 import os
 import time
 from collections import Counter
-from pprint import pprint
 from sys import exit
 
 import requests
@@ -18,6 +18,12 @@ COLLECTION_TIME = Summary(
     "jenkins_collector_collect_seconds", "Time spent to collect metrics from Jenkins"
 )
 
+logging.basicConfig(level=logging.WARNING)
+
+logger = logging.getLogger('jenkins_exporter')
+
+logger.setLevel(logging.DEBUG if DEBUG else logging.INFO)
+
 
 class JenkinsClient:
     def __init__(self, jenkins_base_url, username, password, insecure=False):
@@ -27,6 +33,8 @@ class JenkinsClient:
         self._jenkins_base_url = jenkins_base_url
 
     def get_builds(self, job_name, branch, filter_func=None):
+        logger.info("Getting build for %s and branch %s", job_name, branch)
+        start = time.perf_counter()
         url = f"job/{job_name}/job/{branch}/api/json"
         params = {"tree": "builds[number,duration,result,timestamp]"}
 
@@ -44,13 +52,16 @@ class JenkinsClient:
             # Populate stages data
             build["stages"] = build_info["stages"]
 
+        duration = time.perf_counter() - start
+        logger.info("Fetched build info in %s", duration)
         return builds
 
     def _make_request(self, url_fragment, params=None):
         if params is None:
             params = {}
-
+        start = time.perf_counter()
         url = f"{self._jenkins_base_url}/{url_fragment}"
+        logger.debug("Making request to url %s", url)
 
         has_auth_credentials = self._username and self._password
 
@@ -63,6 +74,9 @@ class JenkinsClient:
             )
         else:
             response = requests.get(url, params=params, verify=(not self._insecure))
+
+        stop = time.perf_counter()
+        logger.debug("Completed request in %s", stop - start)
 
         if response.status_code != requests.codes.ok:
             raise Exception(
@@ -92,6 +106,7 @@ class JenkinsCollector(object):
         self._jenkins = jenkins_client
 
     def collect(self):
+        logger.info("Collecting metrics")
         start = time.time()
 
         # Request data from Jenkins
@@ -105,11 +120,8 @@ class JenkinsCollector(object):
         self._setup_empty_prometheus_metrics()
 
         for job in jobs:
-            print(job)
             name = job["fullName"]
-            if DEBUG:
-                print("Found Job: {}".format(name))
-                pprint(job)
+            logger.debug("Processing Job %s", name)
 
             self._get_metrics(name, job)
 
@@ -117,14 +129,17 @@ class JenkinsCollector(object):
             yield metric
 
         duration = time.time() - start
+        logger.info("Completed collecting metrics in %s s", duration)
         COLLECTION_TIME.observe(duration)
 
     def _request_data(self, job_name, branch):
+        logger.info("Requesting data from %s and branch %s", job_name, branch)
+
         def should_include_build(build):
-            lookup_interval = datetime.timedelta(hours=1)
+            lookup_interval = datetime.timedelta(minutes=1)
             filter_lower_bound = datetime.datetime.now() - lookup_interval
 
-            return build["timestamp"] > filter_lower_bound.timestamp() * 1000
+            return (build["timestamp"] + build["duration"]) > filter_lower_bound.timestamp() * 1000
 
         return self._jenkins.get_builds(
             job_name, branch, filter_func=should_include_build
@@ -182,17 +197,21 @@ class JenkinsCollector(object):
         self._add_data_to_prometheus_structure(build_data, job, name)
 
     def _add_data_to_prometheus_structure(self, build_data, job, name):
-        finished = list(filter(lambda x: x["duration"] != 0, build_data))
-        pending = list(filter(lambda x: x["duration"] == 0, build_data))
-        successful = list(filter(lambda x: x["result"] == "SUCCESS", build_data))
-        failed = list(
+        finished = len(list(filter(lambda x: x["duration"] != 0, build_data)))
+        pending = len(list(filter(lambda x: x["duration"] == 0, build_data)))
+        successful = len(list(filter(lambda x: x["result"] == "SUCCESS", build_data)))
+        failed = len(list(
             filter(lambda x: x["result"] in ["FAILURE", "ABORTED"], build_data)
-        )
+        ))
 
-        self._prometheus_metrics["passCount"].add_metric([name], len(successful))
-        self._prometheus_metrics["failCount"].add_metric([name], len(failed))
-        self._prometheus_metrics["pendingCount"].add_metric([name], len(pending))
-        self._prometheus_metrics["totalCount"].add_metric([name], len(finished))
+        logger.info("For job %s recorded %s finished %s pending %s successful %s failed", name, finished, pending,
+                    successful,
+                    failed)
+
+        self._prometheus_metrics["passCount"].add_metric([name], successful)
+        self._prometheus_metrics["failCount"].add_metric([name], failed)
+        self._prometheus_metrics["pendingCount"].add_metric([name], pending)
+        self._prometheus_metrics["totalCount"].add_metric([name], finished)
 
         total_duration = calculate_total_duration(build_data)
 
@@ -210,9 +229,16 @@ class JenkinsCollector(object):
                     [*labels, str(build["number"])], stage["durationMillis"]
                 )
 
+                if stage["status"] == "PENDING":
+                    logger.debug("Skipping PENDING build %s #%s %s", name, build['number'], stage['name'])
+                    continue
+
                 if stage["status"] == "SUCCESS":
+                    logger.debug("Recording SUCCESS for %s build #%s and stage %s", name, build['number'],
+                                 stage['name'])
                     pass_counter.update([stage["name"]])
                 else:
+                    logger.debug("Recording FAIL for %s build #%s and stage %s", name, build['number'], stage['name'])
                     fail_counter.update([stage["name"]])
 
         for stage_name, count in pass_counter.items():
@@ -281,15 +307,17 @@ def main():
         jenkins_client = JenkinsClient(
             jenkins_base_url, args.user, args.password, args.insecure
         )
+        logger.info("Polling %s", args.jenkins)
         REGISTRY.register(JenkinsCollector(jenkins_client))
 
         start_http_server(port)
-        print("Polling {}. Serving at port: {}".format(args.jenkins, port))
+        logger.info("Serving at  port: %s", port)
         while True:
             time.sleep(1)
     except KeyboardInterrupt:
         print(" Interrupted")
         exit(0)
 
-if __name__ == "__main__":	
+
+if __name__ == "__main__":
     main()
