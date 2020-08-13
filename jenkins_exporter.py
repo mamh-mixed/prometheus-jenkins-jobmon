@@ -6,9 +6,10 @@ import logging
 import os
 import time
 from collections import Counter
-from sys import exit
+from dataclasses import dataclass
 
 import requests
+import yaml
 from prometheus_client import start_http_server, Summary
 from prometheus_client.core import GaugeMetricFamily, CounterMetricFamily, REGISTRY
 
@@ -25,12 +26,25 @@ logger = logging.getLogger('jenkins_exporter')
 logger.setLevel(logging.DEBUG if DEBUG else logging.INFO)
 
 
+@dataclass
+class Repository:
+    name: str
+    group: str
+
+
 class JenkinsClient:
     def __init__(self, jenkins_base_url, username, password, insecure=False):
         self._insecure = insecure
         self._password = password
         self._username = username
         self._jenkins_base_url = jenkins_base_url
+
+    def get_jobs(self, parent):
+        logger.info("Getting jobs for %s", parent)
+        url_job = f"job/{parent}/api/json?tree=jobs[name]"
+        params = {"tree": "jobs[name]"}
+        response = self._make_request(url_job, params)
+        return [job["name"] for job in response["jobs"]]
 
     def get_builds(self, job_name, branch, filter_func=None):
         logger.info("Getting build for %s and branch %s", job_name, branch)
@@ -102,37 +116,37 @@ def calculate_total_duration(build_data):
 
 
 class JenkinsCollector(object):
-    def __init__(self, jenkins_client):
+    def __init__(self, jenkins_client, repositories):
         self._jenkins = jenkins_client
-
-    def collect(self):
-        logger.info("Collecting metrics")
-        start = time.time()
-
-        # Request data from Jenkins
-        jobs = [
-            {
-                "fullName": "consumer-fresh-env-tests/master",
-                "builds": self._request_data("consumer-fresh-env-tests", "master"),
-            }
-        ]
-
+        self.repositories = repositories
         self._setup_empty_prometheus_metrics()
 
-        for job in jobs:
-            name = job["fullName"]
-            logger.debug("Processing Job %s", name)
+    def collect(self):
 
-            self._get_metrics(name, job)
+        # Request data from Jenkins
 
         for metric in self._prometheus_metrics.values():
             yield metric
 
+    def update_metrics(self):
+        logger.info("Collecting metrics")
+        start = time.time()
+        self._setup_empty_prometheus_metrics()
+        for repository in self.repositories:
+            try:
+                logger.debug("Processing Job %s", repository.name)
+                branches = self._jenkins.get_jobs(repository.name)
+                for branch in branches:
+                    job = f"{repository.name}/{branch}"
+                    self._get_metrics(job, repository)
+            except BaseException as e:
+                logger.exception("Failed collecting metrics %s", e)
         duration = time.time() - start
         logger.info("Completed collecting metrics in %s s", duration)
         COLLECTION_TIME.observe(duration)
 
-    def _request_data(self, job_name, branch):
+    def _request_data(self, name):
+        job_name, branch = name.split("/", 2)
         logger.info("Requesting data from %s and branch %s", job_name, branch)
 
         def should_include_build(build):
@@ -153,50 +167,50 @@ class JenkinsCollector(object):
             "totalDurationMillis": GaugeMetricFamily(
                 "jenkins_job_monitor_total_duration_seconds_sum",
                 "Jenkins build total duration in millis",
-                labels=["jobname"],
+                labels=["jobname", "group", "repository"],
             ),
             "failCount": GaugeMetricFamily(
                 "jenkins_job_monitor_fail_count",
                 "Jenkins build fail counts",
-                labels=["jobname"],
+                labels=["jobname", "group", "repository"],
             ),
             "totalCount": GaugeMetricFamily(
                 "jenkins_job_monitor_total_count",
                 "Jenkins build total counts",
-                labels=["jobname"],
+                labels=["jobname", "group", "repository"],
             ),
             "passCount": GaugeMetricFamily(
                 "jenkins_job_monitor_pass_count",
                 "Jenkins build pass counts",
-                labels=["jobname"],
+                labels=["jobname", "group", "repository"],
             ),
             "pendingCount": GaugeMetricFamily(
                 "jenkins_job_monitor_pending_count",
                 "Jenkins build pending counts",
-                labels=["jobname"],
+                labels=["jobname", "group", "repository"],
             ),
             "stage_duration": GaugeMetricFamily(
                 "jenkins_job_monitor_stage_duration",
                 "Jenkins build stage duration in ms",
-                labels=["jobname", "stagename", "build"],
+                labels=["jobname", "group", "repository", "stagename", "build"],
             ),
             "stage_pass_count": CounterMetricFamily(
                 "jenkins_job_monitor_stage_pass_count",
                 "Jenkins build stage pass count",
-                labels=["jobname", "stagename"],
+                labels=["jobname", "group", "repository", "stagename"],
             ),
             "stage_fail_count": CounterMetricFamily(
                 "jenkins_job_monitor_stage_fail_count",
                 "Jenkins build stage fail count",
-                labels=["jobname", "stagename"],
+                labels=["jobname", "group", "repository", "stagename"],
             ),
         }
 
-    def _get_metrics(self, name, job):
-        build_data = job["builds"] or {}
-        self._add_data_to_prometheus_structure(build_data, job, name)
+    def _get_metrics(self, name, repository):
+        build_data = self._request_data(name) or {}
+        self._add_data_to_prometheus_structure(build_data, name, repository)
 
-    def _add_data_to_prometheus_structure(self, build_data, job, name):
+    def _add_data_to_prometheus_structure(self, build_data, name, repository):
         finished = len(list(filter(lambda x: x["duration"] != 0, build_data)))
         pending = len(list(filter(lambda x: x["duration"] == 0, build_data)))
         successful = len(list(filter(lambda x: x["result"] == "SUCCESS", build_data)))
@@ -208,15 +222,15 @@ class JenkinsCollector(object):
                     successful,
                     failed)
 
-        self._prometheus_metrics["passCount"].add_metric([name], successful)
-        self._prometheus_metrics["failCount"].add_metric([name], failed)
-        self._prometheus_metrics["pendingCount"].add_metric([name], pending)
-        self._prometheus_metrics["totalCount"].add_metric([name], finished)
+        self._prometheus_metrics["passCount"].add_metric([name, repository.group, repository.name], successful)
+        self._prometheus_metrics["failCount"].add_metric([name, repository.group, repository.name], failed)
+        self._prometheus_metrics["pendingCount"].add_metric([name, repository.group, repository.name], pending)
+        self._prometheus_metrics["totalCount"].add_metric([name, repository.group, repository.name], finished)
 
         total_duration = calculate_total_duration(build_data)
 
         self._prometheus_metrics["totalDurationMillis"].add_metric(
-            [name], total_duration
+            [name, repository.group, repository.name], total_duration
         )
 
         pass_counter = Counter()
@@ -224,7 +238,7 @@ class JenkinsCollector(object):
 
         for build in build_data:
             for stage in build["stages"]:
-                labels = [name, stage["name"]]
+                labels = [name, repository.group, repository.name, stage["name"]]
                 self._prometheus_metrics["stage_duration"].add_metric(
                     [*labels, str(build["number"])], stage["durationMillis"]
                 )
@@ -243,11 +257,11 @@ class JenkinsCollector(object):
 
         for stage_name, count in pass_counter.items():
             self._prometheus_metrics["stage_pass_count"].add_metric(
-                [name, stage_name], count
+                [name, repository.group, repository.name, stage_name], count
             )
         for stage_name, count in fail_counter.items():
             self._prometheus_metrics["stage_fail_count"].add_metric(
-                [name, stage_name], count
+                [name, repository.group, repository.name, stage_name], count
             )
 
 
@@ -299,24 +313,26 @@ def parse_args():
 
 
 def main():
-    try:
-        args = parse_args()
-        port = int(args.port)
-        jenkins_base_url = args.jenkins.rstrip("/")
+    args = parse_args()
+    port = int(args.port)
+    jenkins_base_url = args.jenkins.rstrip("/")
+    with open("config.yml") as config_file:
+        config = yaml.safe_load(config_file)
 
-        jenkins_client = JenkinsClient(
-            jenkins_base_url, args.user, args.password, args.insecure
-        )
-        logger.info("Polling %s", args.jenkins)
-        REGISTRY.register(JenkinsCollector(jenkins_client))
+    repositories = [Repository(name=repo, group=repo_config["team"]) for repo, repo_config in config["jobs"].items()]
 
-        start_http_server(port)
-        logger.info("Serving at  port: %s", port)
-        while True:
-            time.sleep(1)
-    except KeyboardInterrupt:
-        print(" Interrupted")
-        exit(0)
+    jenkins_client = JenkinsClient(
+        jenkins_base_url, args.user, args.password, args.insecure
+    )
+    logger.info("Polling %s", args.jenkins)
+    collector = JenkinsCollector(jenkins_client, repositories)
+    REGISTRY.register(collector)
+
+    start_http_server(port)
+    logger.info("Serving at  port: %s", port)
+    while True:
+        collector.update_metrics()
+        time.sleep(60)
 
 
 if __name__ == "__main__":
