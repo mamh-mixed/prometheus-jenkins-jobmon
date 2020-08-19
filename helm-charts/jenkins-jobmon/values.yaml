@@ -27,3 +27,10 @@ config:
   jenkinsServer: ""
   jenkinsUser: ""
   jenkinsPassword: ""
+
+serviceMonitor:
+  enabled: true
+  interval: ""
+  release: ""
+  prometheus: ""
+  port: ""
