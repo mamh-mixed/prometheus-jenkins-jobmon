@@ -35,6 +35,13 @@ spec:
           - name: JENKINS_SERVER
             value: {{ .Values.config.jenkinsServer }}
           - name: JENKINS_USER
-            value: {{ .Values.config.jenkinsUser }}
+            valueFrom:
+              secretKeyRef:
+                name: {{ .Values.config.secretName | default "jenkins-jobmon-secrets" }}
+                key: username
           - name: JENKINS_PASSWORD
-            value: {{ .Values.config.jenkinsPassword }}
+            valueFrom:
+              secretKeyRef:
+                name: {{ .Values.config.secretName | default "jenkins-jobmon-secrets" }}
+                key: password
+
