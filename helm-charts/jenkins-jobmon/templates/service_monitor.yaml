@@ -1,0 +1,19 @@
+{{- if .Values.serviceMonitor.enabled -}}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ include "jenkins-jobmon.fullname" . }}
+  labels:
+    {{- include "jenkins-jobmon.labels" . | nindent 4 }}
+    release: {{ .Values.serviceMonitor.release | default "prom-op" }}
+    prometheus: {{ .Values.serviceMonitor.prometheus | default "kube-prometheus" }}
+spec:
+  selector:
+    matchLabels:
+      {{- include "jenkins-jobmon.selectorLabels" . | nindent 6 }}
+  endpoints:
+    - port: {{ .Values.serviceMonitor.port | default "metrics" }}
+      interval: {{ .Values.serviceMonitor.interval | default "1m" }}
+      path: /
+      honorLabels: true
+{{- end -}}
