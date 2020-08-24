@@ -5,15 +5,15 @@ metadata:
   name: {{ include "jenkins-jobmon.fullname" . }}
   labels:
     {{- include "jenkins-jobmon.labels" . | nindent 4 }}
-    release: {{ .Values.serviceMonitor.release | default "prom-op" }}
-    prometheus: {{ .Values.serviceMonitor.prometheus | default "kube-prometheus" }}
+    release: {{ .Values.serviceMonitor.release }}
+    prometheus: {{ .Values.serviceMonitor.prometheus }}
 spec:
   selector:
     matchLabels:
       {{- include "jenkins-jobmon.selectorLabels" . | nindent 6 }}
   endpoints:
-    - port: {{ .Values.serviceMonitor.port | default "metrics" }}
-      interval: {{ .Values.serviceMonitor.interval | default "1m" }}
+    - port: {{ .Values.serviceMonitor.port }}
+      interval: {{ .Values.serviceMonitor.interval }}
       path: /
       honorLabels: true
 {{- end -}}
