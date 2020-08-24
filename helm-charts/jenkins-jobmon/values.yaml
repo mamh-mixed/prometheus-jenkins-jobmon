@@ -8,7 +8,7 @@ image:
   repository: jenkins-exporter
   pullPolicy: IfNotPresent
   # Overrides the image tag whose default is the chart appVersion.
-  tag: ""
+  tag: "latest"
 
 imagePullSecrets: []
 nameOverride: ""
@@ -25,11 +25,11 @@ service:
 
 config:
   jenkinsServer: ""
-  secretName: ""
+  secretName: "jenkins-jobmon-secrets"
 
 serviceMonitor:
   enabled: true
-  interval: ""
-  release: ""
-  prometheus: ""
-  port: ""
+  interval: "1m"
+  release: "prom-op"
+  prometheus: "kube-prometheus"
+  port: "metrics"

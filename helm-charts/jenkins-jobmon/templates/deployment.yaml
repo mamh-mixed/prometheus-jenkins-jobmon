@@ -23,7 +23,7 @@ spec:
         - name: {{ .Chart.Name }}
           securityContext:
             {{- toYaml .Values.securityContext | nindent 12 }}
-          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default "latest"}}"
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag}}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           ports:
             - name: http
@@ -37,11 +37,11 @@ spec:
           - name: JENKINS_USER
             valueFrom:
               secretKeyRef:
-                name: {{ .Values.config.secretName | default "jenkins-jobmon-secrets" }}
+                name: {{ .Values.config.secretName }}
                 key: username
           - name: JENKINS_PASSWORD
             valueFrom:
               secretKeyRef:
-                name: {{ .Values.config.secretName | default "jenkins-jobmon-secrets" }}
+                name: {{ .Values.config.secretName }}
                 key: password
 
