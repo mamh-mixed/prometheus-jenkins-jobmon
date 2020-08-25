@@ -26,7 +26,7 @@ kubectl create secret generic $(secretName) --from-literal=username=$(USERNAME) 
 - Run following commands : 
 
 ```
-helm repo add jenkins-jobmon https://raw.githubusercontent.com/grofers/jenkins-jobmon/helm-charts
+helm repo add jenkins-jobmon https://raw.githubusercontent.com/grofers/jenkins-jobmon/master/helm-charts
 ```
 
 ```
