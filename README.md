@@ -79,4 +79,10 @@ docker run -p 9118:9118 \
 - Run tests using `make test`
 
 
+## Grafana 
+We have provided a Grafana dashboard in `grafana` directory. You can import it and configure your 
+datasource to visualise metrics.
+
+![Grafana Dashboard](grafana/dashboard.png)
+
 [1]: https://github.com/prometheus/client_python#custom-collectors
