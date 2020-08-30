@@ -44,4 +44,12 @@ spec:
               secretKeyRef:
                 name: {{ .Values.config.secretName }}
                 key: password
+          volumeMounts:
+            - name: config-volume
+              mountPath: /usr/src/app/config.yml
+              subPath: config.yml
+      volumes:
+        - name: config-volume
+          configMap:
+            name: {{ .Values.config.configMapName }}
 

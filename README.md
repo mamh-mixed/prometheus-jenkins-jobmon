@@ -2,35 +2,43 @@
 
 Jenkins exporter for Prometheus in python. It uses [Prometheus custom collector API](https://github.com/prometheus/client_python#custom-collectors), which allows making custom collectors by proxying metrics from other systems.
 
-# Installation 
-```
-git clone git@github.com:grofers/jenkins-jobmon.git
-cd jenkins-jobmon
-```
-
 # Configuration 
 
-- Create configuration file using configuration template:
-    `cp config.yml.example config.yml`
-- In config.yml set `team name` and `repo name`, to be monitored. 
-
-# Usage 
-
-## Helm 
-
-- Create a kubernetes secret : 
+- Create a file `config.yml` using this template:
+```yaml
+jobs:
+  example:          # Put your repo name here
+    team: example   # Put your team name
 ```
-kubectl create secret generic $(secretName) --from-literal=username=$(USERNAME) --from-literal=password=$(PASSWORD)
+- Replace `team name` and `repo name` with the repos to be monitored.
+
+# Usage
+
+## Helm
+
+- Create a kubernetes ConfigMap from `config.yml`:
+```
+kubectl create configmap jenkins-jobmon-config --from-file=config.yml
+```
+
+- Create a kubernetes secret:
+```
+kubectl create secret generic jenkins-jobmon-secrets --from-literal=username=username --from-literal=password=password
 
 ```
-- Run following commands : 
+- Run following commands:
 
 ```
 helm repo add jenkins-jobmon https://raw.githubusercontent.com/grofers/jenkins-jobmon/master/helm-charts
 ```
 
 ```
-helm install jenkins-jobmon/jenkins-jobmon --generate-name --set config.jenkinsServer=$(JENKINS_SERVER) --set config.secretName=$(secretName) --set image.repository=$(IMAGE) --set image.tag=$(TAG)
+helm install jenkins-jobmon/jenkins-jobmon --generate-name \
+    --set config.jenkinsServer=http://jenkins.example.com \
+    --set config.secretName=jenkins-jobmon-secrets \
+    --set config.configMapName=jenkins-jobmon-config \
+    --set image.repository=$IMAGE \
+    --set image.tag=$TAG
 ```
 
 ## Docker
@@ -38,5 +46,9 @@ helm install jenkins-jobmon/jenkins-jobmon --generate-name --set config.jenkinsS
 ```
 docker build -t $(IMAGENAME):$(TAG) .
 
-docker run -p 9118:9118 -e JENKINS_SERVER=$(JENKINS_SERVER) -e JENKINS_USER=$(JENKINS_USER) -e JENKINS_PASSWORD=$(JENKINS_PASSWORD) -e DEBUG=1 $(IMAGENAME):$(TAG)
+docker run -p 9118:9118 \
+    -e JENKINS_SERVER=http://jenkins.example.com \
+    -e JENKINS_USER=username \
+    -e JENKINS_PASSWORD=password \
+    -v /usr/src/app/config.yml:$(pwd)/config.yml $IMAGE:$TAG \
 ```

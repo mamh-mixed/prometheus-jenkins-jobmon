@@ -26,6 +26,7 @@ service:
 config:
   jenkinsServer: ""
   secretName: "jenkins-jobmon-secrets"
+  configMapName: "jenkins-jobmon-config"
 
 serviceMonitor:
   enabled: true
