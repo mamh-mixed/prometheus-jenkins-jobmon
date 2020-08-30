@@ -13,7 +13,7 @@ class Repository:
 
 
 class JenkinsClient:
-    def __init__(self, jenkins_base_url, username, password, insecure=False):
+    def __init__(self, jenkins_base_url, username=None, password=None, insecure=False):
         self._insecure = insecure
         self._password = password
         self._username = username
@@ -41,7 +41,7 @@ class JenkinsClient:
         )
 
         for build in builds:
-            build_info = self.get_build_info(job_name, branch, build["number"])
+            build_info = self.__get_build_info(job_name, branch, build["number"])
 
             # Populate stages data
             build["stages"] = build_info["stages"]
@@ -72,13 +72,13 @@ class JenkinsClient:
         stop = time.perf_counter()
         logger.debug("Completed request in %s", stop - start)
 
-        if response.status_code != requests.codes.ok:
+        if response.status_code != 200:
             raise Exception(
                 f"Call to url {url} failed with status: {response.status_code}"
             )
 
         return response.json()
 
-    def get_build_info(self, job_name, branch, build_number):
+    def __get_build_info(self, job_name, branch, build_number):
         url = f"job/{job_name}/job/{branch}/{build_number}/wfapi/describe"
         return self._make_request(url)
