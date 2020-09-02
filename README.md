@@ -1,5 +1,7 @@
 # Jenkins Jobmon 
 
+[![CI Actions Status](https://github.com/grofers/jenkins-jobmon/workflows/ci/badge.svg)](https://github.com/grofers/jenkins-jobmon/actions)
+
 Jenkins exporter for Prometheus in python.
 
 It uses [Prometheus custom collector API][1], which allows making custom
@@ -69,5 +71,12 @@ docker run -p 9118:9118 \
     -e JENKINS_PASSWORD=password \
     -v /usr/src/app/config.yml:$(pwd)/config.yml $IMAGE:$TAG \
 ```
+## Setup Development Environment
+
+- Create a virtualenv using `virtualenv env`
+- Activate virtualenv using `source ./env/bin/activate`
+- Run `pip install -r requirements.txt -r requirements-dev.txt` to install requirements
+- Run tests using `make test`
+
 
 [1]: https://github.com/prometheus/client_python#custom-collectors
