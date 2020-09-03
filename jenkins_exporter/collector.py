@@ -61,7 +61,9 @@ class JenkinsCollector(object):
             lookup_interval = datetime.timedelta(minutes=1)
             filter_lower_bound = datetime.datetime.now() - lookup_interval
 
-            return (build["timestamp"] + build["duration"]) > filter_lower_bound.timestamp() * 1000
+            return (
+                build["timestamp"] + build["duration"]
+            ) > filter_lower_bound.timestamp() * 1000
 
         return self._jenkins.get_builds(
             job_name, branch, filter_func=should_include_build
@@ -132,15 +134,29 @@ class JenkinsCollector(object):
                 )
 
                 if stage["status"] == "PENDING":
-                    logger.debug("Skipping PENDING build %s #%s %s", name, build['number'], stage['name'])
+                    logger.debug(
+                        "Skipping PENDING build %s #%s %s",
+                        name,
+                        build["number"],
+                        stage["name"],
+                    )
                     continue
 
                 if stage["status"] == "SUCCESS":
-                    logger.debug("Recording SUCCESS for %s build #%s and stage %s", name, build['number'],
-                                 stage['name'])
+                    logger.debug(
+                        "Recording SUCCESS for %s build #%s and stage %s",
+                        name,
+                        build["number"],
+                        stage["name"],
+                    )
                     pass_counter.update([stage["name"]])
                 else:
-                    logger.debug("Recording FAIL for %s build #%s and stage %s", name, build['number'], stage['name'])
+                    logger.debug(
+                        "Recording FAIL for %s build #%s and stage %s",
+                        name,
+                        build["number"],
+                        stage["name"],
+                    )
                     fail_counter.update([stage["name"]])
 
         for stage_name, count in pass_counter.items():
@@ -156,16 +172,29 @@ class JenkinsCollector(object):
         finished = len(list(filter(lambda x: x["duration"] != 0, build_data)))
         pending = len(list(filter(lambda x: x["duration"] == 0, build_data)))
         successful = len(list(filter(lambda x: x["result"] == "SUCCESS", build_data)))
-        failed = len(list(
-            filter(lambda x: x["result"] in ["FAILURE", "ABORTED"], build_data)
-        ))
-        logger.info("For job %s recorded %s finished %s pending %s successful %s failed", name, finished, pending,
-                    successful,
-                    failed)
-        self._prometheus_metrics["passCount"].add_metric([name, repository.group, repository.name], successful)
-        self._prometheus_metrics["failCount"].add_metric([name, repository.group, repository.name], failed)
-        self._prometheus_metrics["pendingCount"].add_metric([name, repository.group, repository.name], pending)
-        self._prometheus_metrics["totalCount"].add_metric([name, repository.group, repository.name], finished)
+        failed = len(
+            list(filter(lambda x: x["result"] in ["FAILURE", "ABORTED"], build_data))
+        )
+        logger.info(
+            "For job %s recorded %s finished %s pending %s successful %s failed",
+            name,
+            finished,
+            pending,
+            successful,
+            failed,
+        )
+        self._prometheus_metrics["passCount"].add_metric(
+            [name, repository.group, repository.name], successful
+        )
+        self._prometheus_metrics["failCount"].add_metric(
+            [name, repository.group, repository.name], failed
+        )
+        self._prometheus_metrics["pendingCount"].add_metric(
+            [name, repository.group, repository.name], pending
+        )
+        self._prometheus_metrics["totalCount"].add_metric(
+            [name, repository.group, repository.name], finished
+        )
         total_duration = calculate_total_duration(build_data)
         self._prometheus_metrics["totalDurationMillis"].add_metric(
             [name, repository.group, repository.name], total_duration
