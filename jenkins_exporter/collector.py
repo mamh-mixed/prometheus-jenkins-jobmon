@@ -151,9 +151,13 @@ class JenkinsCollector(object):
         for build in build_data:
             if build["result"] in ["SUCCESS", "FAILED", "ABORTED"]:
                 for stage in build["stages"]:
-                    stage_name = stage['name']
+                    stage_name = stage["name"]
                     if stage_name not in stages_data:
-                        stages_data[stage_name] = {"durations": [], "failed": 0, "passed": 0}
+                        stages_data[stage_name] = {
+                            "durations": [],
+                            "failed": 0,
+                            "passed": 0,
+                        }
 
                     stages_data[stage_name]["durations"].append(stage["durationMillis"])
 
