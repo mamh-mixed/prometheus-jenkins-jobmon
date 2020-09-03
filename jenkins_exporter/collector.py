@@ -127,37 +127,29 @@ class JenkinsCollector(object):
         fail_counter = Counter()
 
         for build in build_data:
-            for stage in build["stages"]:
-                labels = [name, repository.group, repository.name, stage["name"]]
-                self._prometheus_metrics["stage_duration"].add_metric(
-                    [*labels, str(build["number"])], stage["durationMillis"]
-                )
+            if build['status'] in ["SUCCESS", "FAILED"]:
+                for stage in build["stages"]:
+                    labels = [name, repository.group, repository.name, stage["name"]]
+                    self._prometheus_metrics["stage_duration"].add_metric(
+                        [*labels, str(build["number"])], stage["durationMillis"]
+                    )
 
-                if stage["status"] == "PENDING":
-                    logger.debug(
-                        "Skipping PENDING build %s #%s %s",
-                        name,
-                        build["number"],
-                        stage["name"],
-                    )
-                    continue
-
-                if stage["status"] == "SUCCESS":
-                    logger.debug(
-                        "Recording SUCCESS for %s build #%s and stage %s",
-                        name,
-                        build["number"],
-                        stage["name"],
-                    )
-                    pass_counter.update([stage["name"]])
-                else:
-                    logger.debug(
-                        "Recording FAIL for %s build #%s and stage %s",
-                        name,
-                        build["number"],
-                        stage["name"],
-                    )
-                    fail_counter.update([stage["name"]])
+                    if stage["status"] == "SUCCESS":
+                        logger.debug(
+                            "Recording SUCCESS for %s build #%s and stage %s",
+                            name,
+                            build["number"],
+                            stage["name"],
+                        )
+                        pass_counter.update([stage["name"]])
+                    elif stage["status"] == "FAILED":
+                        logger.debug(
+                            "Recording FAIL for %s build #%s and stage %s",
+                            name,
+                            build["number"],
+                            stage["name"],
+                        )
+                        fail_counter.update([stage["name"]])
 
         for stage_name, count in pass_counter.items():
             self._prometheus_metrics["stage_pass_count"].add_metric(
