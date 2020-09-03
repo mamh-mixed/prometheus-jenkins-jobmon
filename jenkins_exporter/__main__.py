@@ -71,7 +71,10 @@ def main():
     with open("config.yml") as config_file:
         config = yaml.safe_load(config_file)
 
-    repositories = [Repository(name=repo, group=repo_config["team"]) for repo, repo_config in config["jobs"].items()]
+    repositories = [
+        Repository(name=repo, group=repo_config["team"])
+        for repo, repo_config in config["jobs"].items()
+    ]
 
     jenkins_client = JenkinsClient(
         jenkins_base_url, args.user, args.password, args.insecure

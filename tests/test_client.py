@@ -16,24 +16,25 @@ def test_get_jobs(mock_make_request):
         "jobs": [
             {
                 "_class": "org.jenkinsci.plugins.workflow.job.WorkflowJob",
-                "name": "master"
+                "name": "master",
             },
             {
                 "_class": "org.jenkinsci.plugins.workflow.job.WorkflowJob",
-                "name": "alpha"
+                "name": "alpha",
             },
             {
                 "_class": "org.jenkinsci.plugins.workflow.job.WorkflowJob",
-                "name": "beta"
-            }
-        ]
+                "name": "beta",
+            },
+        ],
     }
 
     mock_make_request.return_value = mock_response
 
     assert expected == client.get_jobs("example")
-    mock_make_request.assert_called_with("job/example/api/json?tree=jobs[name]",
-                                         {"tree": "jobs[name]"})
+    mock_make_request.assert_called_with(
+        "job/example/api/json?tree=jobs[name]", {"tree": "jobs[name]"}
+    )
 
 
 @patch.object(client, "_make_request")
@@ -46,13 +47,13 @@ def test_get_builds(mock_make_request):
                         "duration": 579365,
                         "number": 4,
                         "result": "FAILURE",
-                        "timestamp": 1596101460982
+                        "timestamp": 1596101460982,
                     },
                     {
                         "duration": 907114,
                         "number": 5,
                         "result": "FAILURE",
-                        "timestamp": 1596099716442
+                        "timestamp": 1596099716442,
                     },
                 ]
             }
@@ -66,7 +67,7 @@ def test_get_builds(mock_make_request):
                         "status": "SUCCESS",
                         "startTimeMillis": 1598819899396,
                         "durationMillis": 31996,
-                        "pauseDurationMillis": 0
+                        "pauseDurationMillis": 0,
                     },
                     {
                         "id": "30",
@@ -75,8 +76,8 @@ def test_get_builds(mock_make_request):
                         "status": "IN_PROGRESS",
                         "startTimeMillis": 1598819931405,
                         "durationMillis": 272045,
-                        "pauseDurationMillis": 0
-                    }
+                        "pauseDurationMillis": 0,
+                    },
                 ]
             }
 
@@ -90,7 +91,7 @@ def test_get_builds(mock_make_request):
                         "status": "SUCCESS",
                         "startTimeMillis": 1598819899396,
                         "durationMillis": 31996,
-                        "pauseDurationMillis": 0
+                        "pauseDurationMillis": 0,
                     },
                     {
                         "id": "33",
@@ -99,10 +100,9 @@ def test_get_builds(mock_make_request):
                         "status": "IN_PROGRESS",
                         "startTimeMillis": 1598819931405,
                         "durationMillis": 272045,
-                        "pauseDurationMillis": 0
-                    }
+                        "pauseDurationMillis": 0,
+                    },
                 ]
-
             }
 
     expected = [
@@ -119,7 +119,7 @@ def test_get_builds(mock_make_request):
                     "status": "SUCCESS",
                     "startTimeMillis": 1598819899396,
                     "durationMillis": 31996,
-                    "pauseDurationMillis": 0
+                    "pauseDurationMillis": 0,
                 },
                 {
                     "id": "30",
@@ -128,9 +128,9 @@ def test_get_builds(mock_make_request):
                     "status": "IN_PROGRESS",
                     "startTimeMillis": 1598819931405,
                     "durationMillis": 272045,
-                    "pauseDurationMillis": 0
-                }
-            ]
+                    "pauseDurationMillis": 0,
+                },
+            ],
         },
         {
             "duration": 907114,
@@ -145,7 +145,7 @@ def test_get_builds(mock_make_request):
                     "status": "SUCCESS",
                     "startTimeMillis": 1598819899396,
                     "durationMillis": 31996,
-                    "pauseDurationMillis": 0
+                    "pauseDurationMillis": 0,
                 },
                 {
                     "id": "33",
@@ -154,9 +154,9 @@ def test_get_builds(mock_make_request):
                     "status": "IN_PROGRESS",
                     "startTimeMillis": 1598819931405,
                     "durationMillis": 272045,
-                    "pauseDurationMillis": 0
-                }
-            ]
+                    "pauseDurationMillis": 0,
+                },
+            ],
         },
     ]
 
@@ -164,12 +164,16 @@ def test_get_builds(mock_make_request):
 
     assert client.get_builds("example", "master") == expected
 
-    mock_make_request.assert_has_calls([
-        call("job/example/job/master/api/json",
-             {"tree": "builds[number,duration,result,timestamp]"}),
-        call("job/example/job/master/4/wfapi/describe"),
-        call("job/example/job/master/5/wfapi/describe")
-    ])
+    mock_make_request.assert_has_calls(
+        [
+            call(
+                "job/example/job/master/api/json",
+                {"tree": "builds[number,duration,result,timestamp]"},
+            ),
+            call("job/example/job/master/4/wfapi/describe"),
+            call("job/example/job/master/5/wfapi/describe"),
+        ]
+    )
 
 
 @patch("jenkins_exporter.client.requests")
@@ -185,7 +189,9 @@ def test_make_request_should_return_json_from_url(requests_mock):
     actual = jenkins_client._make_request(url)
 
     assert expected == actual
-    requests_mock.get.assert_called_with(f"{jenkins_host}/{url}", params={}, verify=True)
+    requests_mock.get.assert_called_with(
+        f"{jenkins_host}/{url}", params={}, verify=True
+    )
 
 
 @patch("jenkins_exporter.client.requests")
@@ -201,7 +207,9 @@ def test_make_request_should_return_json_from_url_without_verifying_ssl(requests
     actual = jenkins_client._make_request(url)
 
     assert expected == actual
-    requests_mock.get.assert_called_with(f"{jenkins_host}/{url}", params={}, verify=False)
+    requests_mock.get.assert_called_with(
+        f"{jenkins_host}/{url}", params={}, verify=False
+    )
 
 
 @patch("jenkins_exporter.client.requests")
@@ -230,4 +238,6 @@ def test_make_request_should_call_url_with_authentication(requests_mock):
     actual = client._make_request(url)
 
     assert expected == actual
-    requests_mock.get.assert_called_with(f"{jenkins_host}/{url}", params={}, auth=("foobar", "secret"), verify=True)
+    requests_mock.get.assert_called_with(
+        f"{jenkins_host}/{url}", params={}, auth=("foobar", "secret"), verify=True
+    )
