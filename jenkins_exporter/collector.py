@@ -1,6 +1,7 @@
 import datetime
 import time
 from collections import Counter
+from dataclasses import dataclass
 
 from prometheus_client import Summary
 from prometheus_client.core import GaugeMetricFamily, CounterMetricFamily
@@ -21,6 +22,12 @@ def calculate_total_duration(build_data):
 
         total_duration += duration / 1000.0
     return total_duration
+
+
+@dataclass
+class Repository:
+    name: str
+    group: str
 
 
 class JenkinsCollector(object):
@@ -121,14 +128,14 @@ class JenkinsCollector(object):
         self._add_data_to_prometheus_structure(build_data, name, repository)
 
     def _add_data_to_prometheus_structure(self, build_data, name, repository):
-        aggregates = self.get_aggregate_data(build_data, name, repository)
+        aggregates = self.get_aggregate_data(build_data, name)
 
         for key, metric in aggregates.items():
             self._prometheus_metrics[key].add_metric(
                 [name, repository.group, repository.name], metric
             )
 
-        stages_wise_metrics = self.get_stages_data(build_data, name, repository)
+        stages_wise_metrics = self.get_stages_data(build_data, name)
 
         for stage_name, stage_metrics in stages_wise_metrics.items():
             labels = [name, repository.group, repository.name, stage_name]
@@ -145,7 +152,7 @@ class JenkinsCollector(object):
                 stage_metrics["failed"],
             )
 
-    def get_stages_data(self, build_data, name, repository):
+    def get_stages_data(self, build_data, name):
         stages_data = {}
 
         for build in build_data:
@@ -181,7 +188,7 @@ class JenkinsCollector(object):
 
         return stages_data
 
-    def get_aggregate_data(self, build_data, name, repository):
+    def get_aggregate_data(self, build_data, name):
         finished = len(list(filter(lambda x: x["duration"] != 0, build_data)))
         pending = len(list(filter(lambda x: x["duration"] == 0, build_data)))
         successful = len(list(filter(lambda x: x["result"] == "SUCCESS", build_data)))
