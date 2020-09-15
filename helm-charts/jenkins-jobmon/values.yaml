@@ -33,4 +33,4 @@ serviceMonitor:
   interval: "1m"
   release: "prom-op"
   prometheus: "kube-prometheus"
-  port: "metrics"
+  port: "http"
