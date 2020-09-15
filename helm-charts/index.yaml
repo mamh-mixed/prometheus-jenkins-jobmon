@@ -3,12 +3,12 @@ entries:
   jenkins-jobmon:
   - apiVersion: v2
     appVersion: 1.16.0
-    created: "2020-09-02T19:24:39.395745+05:30"
+    created: "2020-09-15T13:43:42.906033+05:30"
     description: Prometheus exporter to monitor Jenkins jobs
-    digest: 82ac015b995c29b28c921a550256ef2c4d1dcb1f93e27afe5bdb8ca4450c80d4
+    digest: 90aa258dcc35e37d8e5f17ed60a5602f5c5e55398280fad0e591377347e1b09b
     name: jenkins-jobmon
     type: application
     urls:
     - jenkins-jobmon-0.1.0.tgz
     version: 0.1.0
-generated: "2020-09-02T19:24:39.394945+05:30"
+generated: "2020-09-15T13:43:42.905517+05:30"
