@@ -69,7 +69,7 @@ docker run -p 9118:9118 \
     -e JENKINS_SERVER=http://jenkins.example.com \
     -e JENKINS_USER=username \
     -e JENKINS_PASSWORD=password \
-    -v /usr/src/app/config.yml:$(pwd)/config.yml $IMAGE:$TAG \
+    -v $(pwd)/config.yml:/usr/src/app/config.yml $IMAGE:$TAG
 ```
 ## Setup Development Environment
 

@@ -6,12 +6,6 @@ import requests
 from .logging import logger
 
 
-@dataclass
-class Repository:
-    name: str
-    group: str
-
-
 class JenkinsClient:
     def __init__(self, jenkins_base_url, username=None, password=None, insecure=False):
         self._insecure = insecure

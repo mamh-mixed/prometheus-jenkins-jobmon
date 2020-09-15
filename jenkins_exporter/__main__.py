@@ -10,8 +10,8 @@ from prometheus_client import start_http_server
 from prometheus_client.core import REGISTRY
 
 from jenkins_exporter.logging import DEBUG, logger
-from .client import JenkinsClient, Repository
-from .collector import JenkinsCollector
+from .client import JenkinsClient
+from .collector import JenkinsCollector, Repository
 
 
 def parse_args():

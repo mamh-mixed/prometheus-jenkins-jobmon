@@ -1,6 +1,7 @@
 import datetime
 import time
 from collections import Counter
+from dataclasses import dataclass
 
 from prometheus_client import Summary
 from prometheus_client.core import GaugeMetricFamily, CounterMetricFamily
@@ -21,6 +22,12 @@ def calculate_total_duration(build_data):
 
         total_duration += duration / 1000.0
     return total_duration
+
+
+@dataclass
+class Repository:
+    name: str
+    group: str
 
 
 class JenkinsCollector(object):
@@ -121,60 +128,75 @@ class JenkinsCollector(object):
         self._add_data_to_prometheus_structure(build_data, name, repository)
 
     def _add_data_to_prometheus_structure(self, build_data, name, repository):
-        self.add_aggregate_data(build_data, name, repository)
+        aggregates = self.get_aggregate_data(build_data, name)
 
-        pass_counter = Counter()
-        fail_counter = Counter()
+        for key, metric in aggregates.items():
+            self._prometheus_metrics[key].add_metric(
+                [name, repository.group, repository.name], metric
+            )
+
+        stages_wise_metrics = self.get_stages_data(build_data, name)
+
+        for stage_name, stage_metrics in stages_wise_metrics.items():
+            labels = [name, repository.group, repository.name, stage_name]
+
+            for d in stage_metrics["durations"]:
+                self._prometheus_metrics["stage_duration"].add_metric(labels, d)
+
+            self._prometheus_metrics["stage_pass_count"].add_metric(
+                labels,
+                stage_metrics["passed"],
+            )
+            self._prometheus_metrics["stage_fail_count"].add_metric(
+                labels,
+                stage_metrics["failed"],
+            )
+
+    def get_stages_data(self, build_data, name):
+        stages_data = {}
 
         for build in build_data:
-            for stage in build["stages"]:
-                labels = [name, repository.group, repository.name, stage["name"]]
-                self._prometheus_metrics["stage_duration"].add_metric(
-                    [*labels, str(build["number"])], stage["durationMillis"]
-                )
+            if build["result"] in ["SUCCESS", "FAILED", "ABORTED"]:
+                for stage in build["stages"]:
+                    stage_name = stage["name"]
+                    if stage_name not in stages_data:
+                        stages_data[stage_name] = {
+                            "durations": [],
+                            "failed": 0,
+                            "passed": 0,
+                        }
 
-                if stage["status"] == "PENDING":
-                    logger.debug(
-                        "Skipping PENDING build %s #%s %s",
-                        name,
-                        build["number"],
-                        stage["name"],
-                    )
-                    continue
+                    stages_data[stage_name]["durations"].append(stage["durationMillis"])
 
-                if stage["status"] == "SUCCESS":
-                    logger.debug(
-                        "Recording SUCCESS for %s build #%s and stage %s",
-                        name,
-                        build["number"],
-                        stage["name"],
-                    )
-                    pass_counter.update([stage["name"]])
-                else:
-                    logger.debug(
-                        "Recording FAIL for %s build #%s and stage %s",
-                        name,
-                        build["number"],
-                        stage["name"],
-                    )
-                    fail_counter.update([stage["name"]])
+                    if stage["status"] == "SUCCESS":
+                        logger.debug(
+                            "Recording SUCCESS for %s build #%s and stage %s",
+                            name,
+                            build["number"],
+                            stage_name,
+                        )
+                        stages_data[stage_name]["passed"] += 1
 
-        for stage_name, count in pass_counter.items():
-            self._prometheus_metrics["stage_pass_count"].add_metric(
-                [name, repository.group, repository.name, stage_name], count
-            )
-        for stage_name, count in fail_counter.items():
-            self._prometheus_metrics["stage_fail_count"].add_metric(
-                [name, repository.group, repository.name, stage_name], count
-            )
+                    elif stage["status"] in ["FAILED", "ABORTED"]:
+                        logger.debug(
+                            "Recording FAIL for %s build #%s and stage %s",
+                            name,
+                            build["number"],
+                            stage_name,
+                        )
+                        stages_data[stage_name]["failed"] += 1
 
-    def add_aggregate_data(self, build_data, name, repository):
+        return stages_data
+
+    def get_aggregate_data(self, build_data, name):
         finished = len(list(filter(lambda x: x["duration"] != 0, build_data)))
         pending = len(list(filter(lambda x: x["duration"] == 0, build_data)))
         successful = len(list(filter(lambda x: x["result"] == "SUCCESS", build_data)))
         failed = len(
             list(filter(lambda x: x["result"] in ["FAILURE", "ABORTED"], build_data))
         )
+        total_duration = calculate_total_duration(build_data)
+
         logger.info(
             "For job %s recorded %s finished %s pending %s successful %s failed",
             name,
@@ -183,19 +205,11 @@ class JenkinsCollector(object):
             successful,
             failed,
         )
-        self._prometheus_metrics["passCount"].add_metric(
-            [name, repository.group, repository.name], successful
-        )
-        self._prometheus_metrics["failCount"].add_metric(
-            [name, repository.group, repository.name], failed
-        )
-        self._prometheus_metrics["pendingCount"].add_metric(
-            [name, repository.group, repository.name], pending
-        )
-        self._prometheus_metrics["totalCount"].add_metric(
-            [name, repository.group, repository.name], finished
-        )
-        total_duration = calculate_total_duration(build_data)
-        self._prometheus_metrics["totalDurationMillis"].add_metric(
-            [name, repository.group, repository.name], total_duration
-        )
+
+        return {
+            "passCount": successful,
+            "failCount": failed,
+            "pendingCount": pending,
+            "totalCount": finished,
+            "totalDurationMillis": total_duration,
+        }
