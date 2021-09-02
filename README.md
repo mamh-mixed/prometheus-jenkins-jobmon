@@ -18,7 +18,9 @@ Currently we fetch following metrics:
 | `jenkins_job_monitor_pending_count` | Gauge | Jenkins build pending counts | `jobname`, `group`, `repository` |
 | `jenkins_job_monitor_stage_duration` | Gauge | Jenkins build stage duration in ms | `jobname`, `group`, `repository`, `stagename`, `build` |
 | `jenkins_job_monitor_stage_pass_count` | Counter | Jenkins build stage pass count | `jobname`, `group`, `repository`, `stagename` |
+| `jenkins_job_monitor_stage_pass_duration_sum` | Gauge | Duration of passing stages | `jobname`, `group`, `repository`, `stagename` |
 | `jenkins_job_monitor_stage_fail_count` | Counter | Jenkins build stage fail count | `jobname`, `group`, `repository`, `stagename` |
+| `jenkins_job_monitor_stage_fail_duration_sum` | Gauge | Duration of failing stages | `jobname`, `group`, `repository`, `stagename` |
 
 ## Usage
 

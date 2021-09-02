@@ -65,7 +65,7 @@ class JenkinsCollector(object):
         logger.info("Requesting data from %s and branch %s", job_name, branch)
 
         def should_include_build(build):
-            lookup_interval = datetime.timedelta(minutes=1)
+            lookup_interval = datetime.timedelta(minutes=30)
             filter_lower_bound = datetime.datetime.now() - lookup_interval
 
             return (
@@ -116,9 +116,19 @@ class JenkinsCollector(object):
                 "Jenkins build stage pass count",
                 labels=["jobname", "group", "repository", "stagename"],
             ),
+            "stage_pass_duration_sum": GaugeMetricFamily(
+                "jenkins_job_monitor_stage_pass_duration_sum",
+                "Jenkins build stage pass count",
+                labels=["jobname", "group", "repository", "stagename"],
+            ),
             "stage_fail_count": CounterMetricFamily(
                 "jenkins_job_monitor_stage_fail_count",
                 "Jenkins build stage fail count",
+                labels=["jobname", "group", "repository", "stagename"],
+            ),
+            "stage_fail_duration_sum": GaugeMetricFamily(
+                "jenkins_job_monitor_stage_fail_duration_sum",
+                "Jenkins build stage pass count",
                 labels=["jobname", "group", "repository", "stagename"],
             ),
         }
@@ -140,16 +150,21 @@ class JenkinsCollector(object):
         for stage_name, stage_metrics in stages_wise_metrics.items():
             labels = [name, repository.group, repository.name, stage_name]
 
-            for d in stage_metrics["durations"]:
-                self._prometheus_metrics["stage_duration"].add_metric(labels, d)
-
             self._prometheus_metrics["stage_pass_count"].add_metric(
                 labels,
                 stage_metrics["passed"],
             )
+            self._prometheus_metrics["stage_pass_duration_sum"].add_metric(
+                labels,
+                stage_metrics["passed_duration_sum"],
+            )
             self._prometheus_metrics["stage_fail_count"].add_metric(
                 labels,
                 stage_metrics["failed"],
+            )
+            self._prometheus_metrics["stage_fail_duration_sum"].add_metric(
+                labels,
+                stage_metrics["failed_duration_sum"],
             )
 
     def get_stages_data(self, build_data, name):
@@ -161,30 +176,35 @@ class JenkinsCollector(object):
                     stage_name = stage["name"]
                     if stage_name not in stages_data:
                         stages_data[stage_name] = {
-                            "durations": [],
+                            "passed_duration_sum": 0,
+                            "failed_duration_sum": 0,
                             "failed": 0,
                             "passed": 0,
                         }
 
-                    stages_data[stage_name]["durations"].append(stage["durationMillis"])
-
                     if stage["status"] == "SUCCESS":
-                        logger.debug(
+                        logger.info(
                             "Recording SUCCESS for %s build #%s and stage %s",
                             name,
                             build["number"],
                             stage_name,
                         )
                         stages_data[stage_name]["passed"] += 1
+                        stages_data[stage_name]["passed_duration_sum"] += stage[
+                            "durationMillis"
+                        ]
 
                     elif stage["status"] in ["FAILED", "ABORTED"]:
-                        logger.debug(
+                        logger.info(
                             "Recording FAIL for %s build #%s and stage %s",
                             name,
                             build["number"],
                             stage_name,
                         )
                         stages_data[stage_name]["failed"] += 1
+                        stages_data[stage_name]["failed_duration_sum"] += stage[
+                            "durationMillis"
+                        ]
 
         return stages_data
 

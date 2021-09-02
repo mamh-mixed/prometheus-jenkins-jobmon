@@ -69,11 +69,16 @@ class TestJenkinsCollector(TestCase):
         builds = [sample_build]
         passing_stage = sample_build["stages"][0]
 
-        failing_build = deepcopy(sample_build)
+        failing_build = deepcopy(
+            sample_build
+        )  # create another build and fail one of the stages
         failing_stage = failing_build["stages"][1]
         failing_stage["status"] = "FAILED"
         builds.append(failing_build)
 
         metrics = self.collector.get_stages_data(builds, "dummy")
         assert metrics[passing_stage["name"]]["passed"] == 2
+        assert metrics[passing_stage["name"]]["passed_duration_sum"] == 31996 * 2
+
         assert metrics[failing_stage["name"]]["failed"] == 1
+        assert metrics[failing_stage["name"]]["failed_duration_sum"] == 272045
